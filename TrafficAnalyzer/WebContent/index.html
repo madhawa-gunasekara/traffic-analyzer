@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<!-- This UI is used only for demonstration purposes. Will be replaced by WSO2 CEP Geo-dashboard. -->
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<title>Feed | Traffic Analyzer</title>
+<link rel="stylesheet" href="http://leafletjs.com/dist/leaflet.css">
+<style>
+html,body {
+	height: 100%;
+	margin: 0px;
+	padding: 0px
+}
+
+.labels {
+	color: red;
+	background-color: white;
+	font-family: "Lucida Grande", "Arial", sans-serif;
+	font-size: 10px;
+	font-weight: bold;
+	text-align: center;
+	width: 40px;
+	border: 2px solid black;
+	white-space: nowrap;
+}
+</style>
+
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet"
+	href="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+<!-- Optional: Include the jQuery library -->
+<script
+	src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+
+<script language="javascript" type="text/javascript">
+	var wsUri = "ws://localhost:9763/outputwebsocket/UIOutputEventAdaptor/feedwebsocket";
+	var output;
+
+	function init() {
+		testWebSocket();
+	}
+
+	function testWebSocket() {
+		websocket = new WebSocket(wsUri);
+		websocket.onopen = function(evt) {
+			onOpen(evt)
+		};
+		websocket.onclose = function(evt) {
+			onClose(evt)
+		};
+		websocket.onmessage = function(evt) {
+			onMessage(evt)
+		};
+		websocket.onerror = function(evt) {
+			onError(evt)
+		};
+	}
+
+	function onOpen(evt) {
+		console.log("Websocket connected.");
+	}
+
+	function onClose(evt) {
+		console.log("Websocket disconnected.");
+	}
+
+	var rowCount = 1;
+
+	function onMessage(evt) {
+		console.log("Response: " + evt.data);
+		var text = evt.data;
+		obj = JSON.parse(text);
+
+		var time = getTime(obj.time);
+
+                var trafficLevel = "";
+
+		if (obj.trafficlevel == "No") {
+			trafficLevel = "<span class='label label-success'>No</span>";
+		} else if (obj.trafficlevel == "Low") {
+			trafficLevel = "<span class='label label-success'>Low</span>";
+		} else if (obj.trafficlevel == "Regular") {
+			trafficLevel = "<span class='label label-warning'>Regular</span>";
+		} else if (obj.trafficlevel == "High") {
+			trafficLevel = "<span class='label label-danger'>High</span>";
+		} else if (obj.trafficlevel == "Very high") {
+			trafficLevel = "<span class='label label-danger'>Very high</span>";
+		} else {
+			trafficLevel = "<span class='label label-default'>No data</span>";
+		}
+
+		markLocation(obj.latitude, obj.longitude, obj.location, trafficLevel); //Place the marker on map
+
+		$('#addr' + rowCount).html(
+				"<td>" + obj.location + "</td><td>" + trafficLevel
+						+ "</td><td>" + time + "</td>");
+		$('#addr' + rowCount).css("transition", "10s");
+		$('#addr' + rowCount).css("background", "#fff");
+		$('#tab_logic').append(
+				'<tr id="addr' + (rowCount + 1)
+						+ '" style="background: #eee;" "></tr>');
+
+		rowCount++;
+	}
+
+	function onError(evt) {
+		console.log("Websocket connection error.");
+	}
+
+	window.addEventListener("load", init, false);
+</script>
+
+</head>
+
+<body>
+	<nav class="navbar navbar-inverse navbar-static-top">
+		<div class="container">
+			<div class="navbar-header">
+				<a class="navbar-brand" href="index.html">Traffic Analyzer</a>
+			</div>
+			<div>
+				<ul class="nav navbar-nav">
+					<li class="active"><a href="index.html">Home</a></li>
+					<li><a href="search.html">Search Traffic</a></li>
+					<li><a href="subscribe.jsp">Subscribe</a></li>
+				</ul>
+			</div>
+		</div>
+	</nav>
+	<div class="container">
+		<div class="row">
+			<div class="col-md-4">
+				<table class="table" id="tab_logic">
+					<thead>
+						<tr>
+							<th>Location</th>
+							<th>Traffic level</th>
+							<th>Time</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr id='addr1' style="background: #eee;"></tr>
+					</tbody>
+				</table>
+			</div>
+			<div class="col-md-8">
+				<div id="map"
+					style="width: 750px; height: 500px; position: relative;"
+					class="leaflet-container leaflet-fade-anim" tabindex="0"></div>
+			</div>
+		</div>
+	</div>
+
+    <script src="./resources/leaflet.js"></script>
+	<script>
+		var map = L.map('map').setView([ 6.91667, 80.1 ], 10);
+
+		L
+				.tileLayer(
+						'https://{s}.tiles.mapbox.com/v3/{id}/{z}/{x}/{y}.png',
+						{
+							maxZoom : 18,
+							attribution : 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, '
+									+ '<a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, '
+									+ 'Imagery © <a href="http://mapbox.com">Mapbox</a>',
+							id : 'examples.map-i875mjb7'
+						}).addTo(map);
+
+		function markLocation(latitude, longitude, location, trafficLevel) {
+			L.marker([ latitude, longitude ]).addTo(map).bindPopup(
+					"<b>" + location + "</b><br>" + trafficLevel).openPopup();
+		}
+
+		function getTime(timestamp) {
+			var date = new Date(timestamp);
+			var hours = date.getHours();
+			var minutes = date.getMinutes();
+			var ampm = hours >= 12 ? 'PM' : 'AM';
+			hours = hours % 12;
+			hours = hours ? hours : 12; // Hour '0' should be '12'
+			minutes = minutes < 10 ? '0' + minutes : minutes;
+			var formattedTime = hours + ':' + minutes + ' ' + ampm;
+			return formattedTime;
+		}
+	</script>
+</body>
+
+</html>

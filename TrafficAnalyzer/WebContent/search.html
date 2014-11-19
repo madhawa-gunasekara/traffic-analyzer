@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<!-- This UI is used only for demonstration purposes. Will be replaced by WSO2 CEP Geo-dashboard. -->
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<title>Search | Traffic Analyzer</title>
+<link rel="stylesheet" href="http://leafletjs.com/dist/leaflet.css">
+<style>
+html,body {
+	height: 100%;
+	margin: 0px;
+	padding: 0px
+}
+
+.labels {
+	color: red;
+	background-color: white;
+	font-family: "Lucida Grande", "Arial", sans-serif;
+	font-size: 10px;
+	font-weight: bold;
+	text-align: center;
+	width: 40px;
+	border: 2px solid black;
+	white-space: nowrap;
+}
+</style>
+
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet"
+	href="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+<!-- Optional: Include the jQuery library -->
+<script
+	src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+
+<script language="javascript" type="text/javascript">
+	function searchTraffic() {
+		var wsInputURI = "ws://localhost:9763/inputwebsocket/SearchInputEventAdaptor/searchinputwebsocket";
+		var wsOutputURI = "ws://localhost:9763/outputwebsocket/UIOutputEventAdaptor/searchoutputwebsocket";
+
+		outputWebsocket = new WebSocket(wsOutputURI);
+		inputWebsocket = new WebSocket(wsInputURI);
+
+		outputWebsocket.onopen = function(evt) {
+			outputOnOpen(evt)
+		};
+		inputWebsocket.onopen = function(evt) {
+			inputOnOpen(evt)
+		};
+
+		outputWebsocket.onmessage = function(evt) {
+			onMessage(evt)
+		};
+
+		outputWebsocket.onclose = function(evt) {
+			onClose(evt)
+		};
+		inputWebsocket.onclose = function(evt) {
+			onClose(evt)
+		};
+		inputWebsocket.onerror = function(evt) {
+			onError(evt)
+		};
+		outputWebsocket.onerror = function(evt) {
+			onError(evt)
+		};
+	}
+
+	function inputOnOpen(evt) {
+		console.log("Input websocket connected.");
+		var location = document.getElementById("location").value;
+
+		var url = 'https://maps.googleapis.com/maps/api/geocode/json?address="'
+				+ location + '"&key=AIzaSyBFEOH-vFu61XTCggSRje1STOyfIpnUBmg';
+
+		jQuery.getJSON(url, function(data) {
+			console.log("Entered location: " + location + ", Latitude: "
+					+ data.results[0].geometry.location.lat + ", Longitude: "
+					+ data.results[0].geometry.location.lng);
+			doSend('{"latitude": "' + data.results[0].geometry.location.lat
+					+ '","longitude": "'
+					+ data.results[0].geometry.location.lng + '"}');
+		});
+	}
+
+	function outputOnOpen(evt) {
+		console.log("Output websocket connected.");
+	}
+
+	function onClose(evt) {
+		console.log("Disconnected.");
+	}
+
+	var rowCount = 1;
+
+	function onMessage(evt) {
+		console.log("Response: " + evt.data);
+
+		var text = evt.data;
+		obj = JSON.parse(text);
+
+		var time = getTime(obj.time);
+
+                var trafficLevel = "";
+
+		if (obj.trafficlevel == "No") {
+			trafficLevel = "<span class='label label-success'>No</span>";
+		} else if (obj.trafficlevel == "Low") {
+			trafficLevel = "<span class='label label-success'>Low</span>";
+		} else if (obj.trafficlevel == "Regular") {
+			trafficLevel = "<span class='label label-warning'>Regular</span>";
+		} else if (obj.trafficlevel == "High") {
+			trafficLevel = "<span class='label label-danger'>High</span>";
+		} else if (obj.trafficlevel == "Very high") {
+			trafficLevel = "<span class='label label-danger'>Very high</span>";
+		} else {
+			trafficLevel = "<span class='label label-default'>No data</span>";
+		}
+
+		markLocation(obj.latitude, obj.longitude, obj.location, trafficLevel); //Place the marker on map
+
+		$('#addr' + rowCount).html(
+				"<td>" + obj.location + "</td><td>" + trafficLevel
+						+ "</td><td>" + time + "</td>");
+		$('#tab_logic').append('<tr id="addr' + (rowCount + 1) + '"></tr>');
+		rowCount++;
+	}
+
+	function onError(evt) {
+		console.log("Error: " + evt.data);
+	}
+
+	function doSend(message) {
+		console.log("Sent: " + message);
+		inputWebsocket.send(message);
+	}
+</script>
+
+</head>
+
+<body>
+	<nav class="navbar navbar-inverse navbar-static-top">
+		<div class="container">
+			<div class="navbar-header">
+				<a class="navbar-brand" href="index.html">Traffic Analyzer</a>
+			</div>
+			<div>
+				<ul class="nav navbar-nav">
+					<li><a href="index.html">Home</a></li>
+					<li class="active"><a href="search.html">Search Traffic</a></li>
+					<li><a href="subscribe.jsp">Subscribe</a></li>
+				</ul>
+			</div>
+		</div>
+	</nav>
+	<div class="container">
+		<div class="row">
+			<div class="col-md-4">
+				<br>
+				<form role="form">
+					<div class="form-group">
+						<input type="text" class="form-control" id="location"
+							placeholder="Enter location" autofocus>
+					</div>
+					<button type="button" class="btn btn-primary"
+						onclick="searchTraffic()">Search</button>
+				</form>
+				<br>
+				<table class="table" id="tab_logic">
+					<thead>
+						<tr>
+							<th>Location</th>
+							<th>Traffic level</th>
+							<th>Time</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr id='addr1'></tr>
+					</tbody>
+				</table>
+			</div>
+			<div class="col-md-8">
+				<div id="map"
+					style="width: 750px; height: 500px; position: relative;"
+					class="leaflet-container leaflet-fade-anim" tabindex="0"></div>
+			</div>
+		</div>
+	</div>
+
+    <script src="./resources/leaflet.js"></script>
+	<script>
+		var map = L.map('map').setView([ 6.91667, 80.1 ], 10);
+
+		L
+				.tileLayer(
+						'https://{s}.tiles.mapbox.com/v3/{id}/{z}/{x}/{y}.png',
+						{
+							maxZoom : 18,
+							attribution : 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, '
+									+ '<a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, '
+									+ 'Imagery © <a href="http://mapbox.com">Mapbox</a>',
+							id : 'examples.map-i875mjb7'
+						}).addTo(map);
+
+		function markLocation(latitude, longitude, location, trafficLevel) {
+			L.marker([ latitude, longitude ]).addTo(map).bindPopup(
+					"<b>" + location + "</b><br>" + trafficLevel).openPopup();
+		}
+
+		function getTime(timestamp) {
+			var date = new Date(timestamp);
+			var hours = date.getHours();
+			var minutes = date.getMinutes();
+			var ampm = hours >= 12 ? 'PM' : 'AM';
+			hours = hours % 12;
+			hours = hours ? hours : 12; // Hour '0' should be '12'
+			minutes = minutes < 10 ? '0' + minutes : minutes;
+			var formattedTime = hours + ':' + minutes + ' ' + ampm;
+			return formattedTime;
+		}
+	</script>
+</body>
+
+</html>
