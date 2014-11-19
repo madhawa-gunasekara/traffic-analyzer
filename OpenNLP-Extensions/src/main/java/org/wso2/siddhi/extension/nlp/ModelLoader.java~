@@ -1,0 +1,74 @@
+package org.wso2.siddhi.extension.nlp;
+
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration.XMLConfiguration;
+import org.wso2.carbon.registry.app.RemoteRegistry;
+import org.wso2.carbon.registry.core.exceptions.RegistryException;
+import org.wso2.carbon.registry.core.utils.RegistryClientUtils;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+
+/**
+ * Created by madhawa30 on 11/7/14.
+ */
+public class ModelLoader {
+
+	private String[] initProperties() {
+		String configurations[] = new String[4];
+		URL is = getClass().getClassLoader().getResource("openNLP.properties");
+		XMLConfiguration configuration = new XMLConfiguration();
+
+		configuration.setURL(is);
+
+		try {
+			configuration.load();
+		} catch (ConfigurationException e) {
+			e.printStackTrace();
+		}
+		configurations[0] = configuration.getString("registryURL");
+		configurations[1] = configuration.getString("userName");
+		configurations[2] = configuration.getString("passWord");
+		configurations[3] = configuration.getString("key_storeFilePath");
+		return configurations;
+	}
+
+	public File retrieveModel(String filePath) throws IOException, RegistryException {
+
+		String values[] = initProperties();
+
+		//  System.out.println(values[3]);
+		// File temp = new File("hsl.bin");
+		File temp = null;
+		try {
+			temp = File.createTempFile("temp-file-name", ".tmp");
+
+			RemoteRegistry remoteRegistry;
+
+			System.setProperty("javax.net.ssl.trustStore", values[3]);
+			System.setProperty("javax.net.ssl.trustStorePassword", "wso2carbon");
+			System.setProperty("javax.net.ssl.trustStoreType", "JKS");
+
+			if (values[1] == null) {
+				remoteRegistry = new RemoteRegistry(new URL(values[0]));
+			} else {
+
+				remoteRegistry = new RemoteRegistry(new URL(values[0]), values[1], values[2]);
+			}
+
+			if (remoteRegistry != null) {
+				RegistryClientUtils.exportFromRegistry(temp,
+				                                       filePath, remoteRegistry);
+			}
+			return temp;
+		} catch (IOException e) {
+			throw e;
+		} catch (RegistryException e) {
+			throw e;
+		}
+
+	}
+}
+
+
